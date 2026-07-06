@@ -2,6 +2,9 @@
 
 An AI-powered Digital Twin platform for FIFA World Cup 2026 that predicts crowd movement before it happens, enabling organizers to make smarter, faster, and safer decisions.
 
+<img width="1862" height="843" alt="image" src="https://github.com/user-attachments/assets/9354de87-b9c7-4e00-ac4f-85fb014f4f3f" />
+
+
 🌍 Overview
 
 Managing tens of thousands of fans inside a stadium is one of the biggest challenges during global sporting events.

@@ -72,14 +72,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "FIFA Pulse AI — Predict Tomorrow's Crowd Today" },
+      { title: "FIFA Pulse AI — Command Center" },
       {
         name: "description",
         content:
           "AI-powered Digital Twin platform predicting stadium crowd movement, safety risk and operations for FIFA World Cup 2026.",
       },
       { name: "author", content: "FIFA Pulse AI" },
-      { property: "og:title", content: "FIFA Pulse AI — Digital Twin for FIFA World Cup 2026" },
+      { property: "og:title", content: "FIFA Pulse AI — Command Center" },
       {
         property: "og:description",
         content:
@@ -87,6 +87,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "FIFA Pulse AI — Command Center" },
+      { name: "description", content: "Predict, prevent, perform. Real-time crowd digital twin for FIFA World Cup 2026." },
+      { property: "og:description", content: "Predict, prevent, perform. Real-time crowd digital twin for FIFA World Cup 2026." },
+      { name: "twitter:description", content: "Predict, prevent, perform. Real-time crowd digital twin for FIFA World Cup 2026." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/9d773d61-503f-4660-a380-b412cd270a7c/id-preview-345d1053--da1485c8-f044-4dcd-8bef-84d654f80024.lovable.app-1783359808866.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/9d773d61-503f-4660-a380-b412cd270a7c/id-preview-345d1053--da1485c8-f044-4dcd-8bef-84d654f80024.lovable.app-1783359808866.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

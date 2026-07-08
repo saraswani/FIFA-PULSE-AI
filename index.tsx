@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   LayoutDashboard, Radar, LineChart as LineIcon, MapPin, Sparkles, FlaskConical,
@@ -9,6 +9,7 @@ import {
   ChevronRight, Zap, Droplets, Recycle, TreePine, ParkingCircle, TrainFront, X, Check, Loader2,
 } from "lucide-react";
 import heroStadium from "@/assets/hero-stadium.jpg";
+import { seeded, formatCount as fmt, occupancyPct } from "@/lib/pulse";
 
 export const Route = createFileRoute("/")({
   component: Dashboard,
@@ -19,9 +20,6 @@ export const Route = createFileRoute("/")({
     ],
   }),
 });
-
-const seeded = (s: number) => { let x = s || 1; return () => { x = (x * 9301 + 49297) % 233280; return x / 233280; }; };
-const fmt = (n: number) => n.toLocaleString();
 
 type NavKey = "dashboard" | "twin" | "predictions" | "stadium" | "insights" | "simulator" | "alerts" | "reports" | "volunteers" | "transport" | "sustainability" | "settings";
 const NAV: { key: NavKey; icon: typeof LayoutDashboard; label: string; badge?: number; section: string }[] = [
@@ -190,7 +188,7 @@ function Card({ title, right, children, className = "", id }: { title?: string; 
 /* ---------------- KPIs (live) ---------------- */
 function KpiRow({ attendance, wait, incidents }: { attendance: number; wait: number; incidents: number }) {
   const items = [
-    { icon: Users2, label: "Total Attendance", value: fmt(attendance), sub: `${Math.min(100, Math.round(attendance / 88000 * 100))}% Capacity`, tint: "text-fifa-blue", bg: "bg-fifa-blue/15" },
+    { icon: Users2, label: "Total Attendance", value: fmt(attendance), sub: `${occupancyPct(attendance, 88000)}% Capacity`, tint: "text-fifa-blue", bg: "bg-fifa-blue/15" },
     { icon: AlertTriangle, label: "Predicted Peak", value: fmt(92600), sub: "in 24 min", tint: "text-fifa-gold", bg: "bg-fifa-gold/15" },
     { icon: Gauge, label: "Crowd Risk Index", value: "MEDIUM", sub: "67 / 100", tint: "text-fifa-gold", bg: "bg-fifa-gold/15" },
     { icon: Clock, label: "Avg. Wait Time", value: `${wait} min`, sub: "-12% vs last match", tint: "text-fifa-green", bg: "bg-fifa-green/15" },
@@ -673,6 +671,25 @@ function GateModal({ gate, onClose }: { gate: Gate | null; onClose: () => void }
   );
 }
 
+/* ---------------- Memoized child aliases ----------------
+ * The dashboard ticks every 2s (attendance, gates, wait time). Wrapping the
+ * pure/heavy children in React.memo skips their reconciliation entirely when
+ * their props are referentially stable — critical for smooth interaction. */
+const MSidebar = memo(Sidebar);
+const MTopBar = memo(TopBar);
+const MKpiRow = memo(KpiRow);
+const MStadiumTwin = memo(StadiumTwin);
+const MPredictionTimeline = memo(PredictionTimeline);
+const MWhatIf = memo(WhatIf);
+const MAiChat = memo(AiChat);
+const MTransport = memo(Transport);
+const MSustainability = memo(Sustainability);
+const MMomentum = memo(Momentum);
+const MHeatmap = memo(Heatmap);
+const MAiRec = memo(AiRec);
+const MTopAlerts = memo(TopAlerts);
+const MQuickActions = memo(QuickActions);
+const MGateModal = memo(GateModal);
 
 /* ---------------- Dashboard ---------------- */
 function Dashboard() {
@@ -694,11 +711,10 @@ function Dashboard() {
 
   // Theme toggle
   useEffect(() => {
-    const root = document.documentElement;
-    if (dark) root.classList.add("dark"); else root.classList.remove("dark");
+    document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
 
-  // Live ticker
+  // Live ticker — single interval mutates all real-time state.
   useEffect(() => {
     const id = setInterval(() => {
       setMinute((m) => (m + 1 / 60) % 90);
@@ -709,76 +725,89 @@ function Dashboard() {
     return () => clearInterval(id);
   }, []);
 
-  // ⌘K focus chat
+  // ⌘K focuses the chat input from anywhere in the app.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); chatInputRef.current?.focus(); }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        chatInputRef.current?.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const handleNav = (k: NavKey) => {
+  // Stable callbacks so memoized children skip rerenders across the 2s ticker.
+  const handleNav = useCallback((k: NavKey) => {
     setNav(k);
-    const item = NAV.find((n) => n.key === k)!;
-    document.getElementById(item.section)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const item = NAV.find((n) => n.key === k);
+    if (item) document.getElementById(item.section)?.scrollIntoView({ behavior: "smooth", block: "start" });
     if (k === "alerts") setNotifOpen(false);
-  };
+  }, []);
 
-  const addNotif = (s: string) => setNotifs((n) => [s, ...n].slice(0, 10));
+  const addNotif = useCallback((s: string) => setNotifs((n) => [s, ...n].slice(0, 10)), []);
+  const clearNotifs = useCallback(() => setNotifs([]), []);
+  
+  const openNotif = useCallback((v: boolean) => setNotifOpen(v), []);
+  const selectGate = useCallback((g: Gate) => setSelectedGate(g), []);
+  const closeGate = useCallback(() => setSelectedGate(null), []);
+  const toggleHeat = useCallback((v: boolean) => setHeatOn(v), []);
+  const closeQuick = useCallback(() => setQuickOpen(false), []);
 
-  const doAction = (label: string) => {
+  const doAction = useCallback((label: string) => {
     toast.success(`${label} triggered`, { description: "Operation logged to command center." });
     addNotif(`${label} action executed by Ops Admin`);
-  };
+  }, [addNotif]);
 
-  const deployNow = () => {
+  const deployNow = useCallback(() => {
     toast.success("Deployment initiated", { description: "Opening Gate D2 · dispatching 15 volunteers to Zone C" });
     setGates((gs) => gs.map((g) => g.id === "C" ? { ...g, predicted: Math.max(g.current, g.predicted - 600), risk: "HIGH", color: "text-fifa-red" } : g));
     addNotif("Deployed 15 volunteers to Zone C · Gate D2 opened");
-  };
+  }, [addNotif]);
 
-  const ackAlert = (id: string) => {
+  const ackAlert = useCallback((id: string) => {
     setAlerts((as) => as.map((a) => a.id === id ? { ...a, ack: true } : a));
     toast.success("Alert acknowledged");
-  };
+  }, []);
 
   return (
     <div id="top" className="min-h-dvh text-foreground flex">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:px-3 focus:py-2 focus:rounded-md focus:bg-fifa-blue focus:text-white">Skip to main content</a>
-      <Sidebar active={nav} onSelect={handleNav} dark={dark} setDark={setDark} />
+      <MSidebar active={nav} onSelect={handleNav} dark={dark} setDark={setDark} />
       <div className="flex-1 flex flex-col min-w-0">
-        <TopBar minute={minute} notifOpen={notifOpen} setNotifOpen={setNotifOpen} notifications={notifs} clearNotifs={() => setNotifs([])} />
+        <MTopBar minute={minute} notifOpen={notifOpen} setNotifOpen={openNotif} notifications={notifs} clearNotifs={clearNotifs} />
         <main id="main-content" aria-label="Command center" className="flex-1 overflow-auto p-5">
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-5">
             <div className="space-y-5 min-w-0">
-              <KpiRow attendance={attendance} wait={wait} incidents={incidents} />
-              <StadiumTwin gates={gates} onGate={setSelectedGate} heatOn={heatOn} setHeatOn={setHeatOn} />
+              <MKpiRow attendance={attendance} wait={wait} incidents={incidents} />
+              <MStadiumTwin gates={gates} onGate={selectGate} heatOn={heatOn} setHeatOn={toggleHeat} />
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                <PredictionTimeline gateId={predGate} setGateId={setPredGate} />
-                <WhatIf addNotif={addNotif} />
-                <AiChat inputRef={chatInputRef} />
+                <MPredictionTimeline gateId={predGate} setGateId={setPredGate} />
+                <MWhatIf addNotif={addNotif} />
+                <MAiChat inputRef={chatInputRef} />
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                <Transport />
-                <Sustainability />
-                <Momentum />
+                <MTransport />
+                <MSustainability />
+                <MMomentum />
               </div>
             </div>
 
             <div id="rail" className="space-y-5">
-              <Heatmap />
-              <AiRec onDeploy={deployNow} />
-              <TopAlerts alerts={alerts} onAck={ackAlert} />
-              {quickOpen && <QuickActions onAction={doAction} onClose={() => setQuickOpen(false)} />}
-              {!quickOpen && (
-                <button onClick={() => setQuickOpen(true)} className="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-muted-foreground">Show Quick Actions</button>
+              <MHeatmap />
+              <MAiRec onDeploy={deployNow} />
+              <MTopAlerts alerts={alerts} onAck={ackAlert} />
+              {quickOpen ? (
+                <MQuickActions onAction={doAction} onClose={closeQuick} />
+              ) : (
+                <button type="button" onClick={() => setQuickOpen(true)} className="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-muted-foreground">Show Quick Actions</button>
               )}
             </div>
           </div>
         </main>
       </div>
-      <GateModal gate={selectedGate} onClose={() => setSelectedGate(null)} />
+      <MGateModal gate={selectedGate} onClose={closeGate} />
     </div>
   );
 }
+
